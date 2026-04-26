@@ -34,15 +34,22 @@ def _normalize_header(col: str) -> str:
 
 
 def parse(excel_path: Path) -> pd.DataFrame:
-    """Excel を読み込み、正規化済み DataFrame を返す。"""
-    df = pd.read_excel(excel_path, header=1, usecols='A:E', engine='openpyxl')
+    """Excel を読み込み、正規化済み DataFrame を返す。
+
+    usecols を指定せず全列読み込みにすることで、年度によって「管理番号」列の
+    有無が異なる場合でも列名ベースで正しく選択できる。
+    """
+    df = pd.read_excel(excel_path, header=1, engine='openpyxl')
     df.columns = [_normalize_header(c) for c in df.columns]
     df = df.rename(columns=_COLUMN_MAP)
     df['ministry'] = 'METI'
     df['publish_date'] = df['publish_date'].apply(convert_reiwa_date)
     df['contractor_name'] = clean_contractor_names(df['contractor_name'])
-    df = df[_OUTPUT_COLS].dropna(subset=['publish_date', 'report_title'])
-    return df
+    # 年度によって存在しない列（url 等）は None で補完してから選択
+    for col in _OUTPUT_COLS:
+        if col not in df.columns:
+            df[col] = None
+    return df[_OUTPUT_COLS].dropna(subset=['publish_date', 'report_title'])
 
 
 def save_csv(df: pd.DataFrame, excel_path: Path) -> Path:
