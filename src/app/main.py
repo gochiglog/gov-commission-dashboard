@@ -57,12 +57,6 @@ if not st.session_state['authenticated']:
 # --- データ読み込み ---
 
 @st.cache_data
-def _load_groups() -> dict[str, list[str]]:
-    with open(_MAPPING_PATH, encoding='utf-8') as f:
-        return json.load(f).get('groups', {})
-
-
-@st.cache_data
 def _load_data() -> pd.DataFrame:
     if not _DB_PATH.exists():
         return pd.DataFrame()
@@ -80,7 +74,6 @@ def _load_data() -> pd.DataFrame:
 
 
 df = _load_data()
-groups = _load_groups()
 
 if df.empty:
     st.error('データが見つかりません。先に ETL スクリプト (meti_parser.py) を実行してください。')
@@ -97,22 +90,6 @@ with st.sidebar:
 
     base = df[df['ministry'] == selected_ministry].copy()
 
-    summary_mode = st.toggle(
-        'ざっくりまとめ表示',
-        value=False,
-        help='KPMG / EY 等のグループ会社を1つにまとめて表示します',
-    )
-
-    if summary_mode:
-        contractor_to_group = {
-            member: group_name
-            for group_name, members in groups.items()
-            for member in members
-        }
-        base['display_name'] = base['contractor_name'].map(contractor_to_group).fillna(base['contractor_name'])
-    else:
-        base['display_name'] = base['contractor_name']
-
     all_years = sorted(base['fiscal_year'].unique().tolist())
     default_years = [y for y in all_years if y not in _DEFAULT_HIDDEN_YEARS]
     selected_years = st.multiselect(
@@ -125,16 +102,15 @@ with st.sidebar:
     filtered = base[base['fiscal_year'].isin(selected_years)]
 
     top_contractors = (
-        filtered.groupby('display_name')
+        filtered.groupby('contractor_name')
         .size()
         .sort_values(ascending=False)
         .head(10)
         .index.tolist()
     )
-    all_contractors = sorted(filtered['display_name'].unique().tolist())
-    multiselect_label = '委託事業者グループ' if summary_mode else '委託事業者'
+    all_contractors = sorted(filtered['contractor_name'].unique().tolist())
     selected_contractors = st.multiselect(
-        f'{multiselect_label}（複数選択可）',
+        '委託事業者（複数選択可）',
         options=all_contractors,
         default=top_contractors,
     )
@@ -151,8 +127,7 @@ st.title('官公庁委託調査ダッシュボード')
 st.caption(
     f'省庁: {selected_ministry}　／　'
     f'対象年度: {len(selected_years)} 年度　／　'
-    f'対象事業者: {len(selected_contractors)} {"グループ" if summary_mode else "社"}'
-    + ('　／　ざっくりまとめ表示中' if summary_mode else '')
+    f'対象事業者: {len(selected_contractors)} 社'
 )
 
 if not selected_years:
@@ -164,8 +139,8 @@ if not selected_contractors:
     st.stop()
 
 agg = (
-    filtered[filtered['display_name'].isin(selected_contractors)]
-    .groupby(['fiscal_year', 'display_name'])
+    filtered[filtered['contractor_name'].isin(selected_contractors)]
+    .groupby(['fiscal_year', 'contractor_name'])
     .size()
     .reset_index(name='件数')
 )
@@ -173,37 +148,34 @@ agg = (
 # 0件の年度もプロットして線で結ぶため、年度×事業者の直積で 0 埋めする
 idx = pd.MultiIndex.from_product(
     [selected_years, selected_contractors],
-    names=['fiscal_year', 'display_name'],
+    names=['fiscal_year', 'contractor_name'],
 )
 chart_df = (
-    agg.set_index(['fiscal_year', 'display_name'])
+    agg.set_index(['fiscal_year', 'contractor_name'])
     .reindex(idx, fill_value=0)
     .reset_index()
-    .sort_values(['display_name', 'fiscal_year'])
+    .sort_values(['contractor_name', 'fiscal_year'])
 )
 
 fig = px.line(
     chart_df,
     x='fiscal_year',
     y='件数',
-    color='display_name',
+    color='contractor_name',
     markers=True,
     title='委託事業者別 年度別受託件数の推移',
-    labels={
-        'fiscal_year': '年度',
-        'display_name': '委託事業者グループ' if summary_mode else '委託事業者',
-    },
+    labels={'fiscal_year': '年度', 'contractor_name': '委託事業者'},
 )
 fig.update_xaxes(dtick=1, tickformat='d')
-fig.update_layout(legend_title_text='委託事業者グループ' if summary_mode else '委託事業者')
+fig.update_layout(legend_title_text='委託事業者')
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander('集計データを表示'):
     pivot = (
-        chart_df.pivot(index='display_name', columns='fiscal_year', values='件数')
+        chart_df.pivot(index='contractor_name', columns='fiscal_year', values='件数')
         .fillna(0)
         .astype(int)
     )
-    pivot.index.name = '委託事業者グループ' if summary_mode else '委託事業者'
+    pivot.index.name = '委託事業者'
     pivot.columns.name = '年度'
     st.dataframe(pivot, use_container_width=True)
