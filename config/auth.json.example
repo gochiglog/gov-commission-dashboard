@@ -1,0 +1,6 @@
+{
+  "_comment": "このファイルをコピーして config/auth.json を作成してください。auth.json は Git 管理対象外です。",
+  "users": {
+    "your_username": "your_password"
+  }
+}
