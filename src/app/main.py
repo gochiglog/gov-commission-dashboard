@@ -68,6 +68,10 @@ def _load_data() -> pd.DataFrame:
     df['contractor_name'] = clean_contractor_names(df['contractor_name'])
     # 連名行（コンマ区切り）を 1 社 1 行に展開（ETL 実行前の旧データへの対応も兼ねる）
     df = expand_multi_contractors(df)
+    # 展開後の各ピースに再マッピング + ゴミフラグメント除去
+    df['contractor_name'] = clean_contractor_names(df['contractor_name'])
+    _JUNK_FRAGMENTS = {'Ltd.', 'Ltd', 'Pvt.', 'Pvt', 'Pte.', 'Pte', 'Co.', 'Inc.', 'Inc', 'Corp.', 'Corp', 'nan', ''}
+    df = df[~df['contractor_name'].isin(_JUNK_FRAGMENTS)]
     # 年度を導出（4月始まり: 4月〜翌3月を同一年度とする）
     df['fiscal_year'] = df['publish_date'].apply(
         lambda d: d.year if d.month >= 4 else d.year - 1

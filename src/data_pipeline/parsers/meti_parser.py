@@ -50,8 +50,16 @@ def parse(excel_path: Path) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = None
     df = df[_OUTPUT_COLS].dropna(subset=['publish_date', 'report_title'])
+    # 「（続き）」のみの継続タイトル行と、contractor_name が nan の不正行を除去
+    df = df[~df['report_title'].astype(str).str.strip().isin(['（続き）', '(続き)'])]
+    df = df[~df['contractor_name'].isin(['nan', 'NaN', 'None', ''])]
     # 連名行を 1 社 1 行に展開（コンマ・全角読点区切り）
     df = expand_multi_contractors(df)
+    # 展開後の各ピースに再マッピングを適用（多社行から分割された社名が未マッピングになる問題を防ぐ）
+    df['contractor_name'] = clean_contractor_names(df['contractor_name'])
+    # "Co., Ltd." 等のカンマ分割で生じた法人種別サフィックスのゴミフラグメントを除去
+    _JUNK_FRAGMENTS = {'Ltd.', 'Ltd', 'Pvt.', 'Pvt', 'Pte.', 'Pte', 'Co.', 'Inc.', 'Inc', 'Corp.', 'Corp', 'nan', ''}
+    df = df[~df['contractor_name'].isin(_JUNK_FRAGMENTS)]
     return df
 
 
