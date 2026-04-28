@@ -10,6 +10,7 @@ import streamlit as st
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DB_PATH = _PROJECT_ROOT / 'data' / 'processed' / 'gov_commission.sqlite'
 _AUTH_PATH = _PROJECT_ROOT / 'config' / 'auth.json'
+_GROUPS_PATH = _PROJECT_ROOT / 'config' / 'groups.json'
 
 sys.path.insert(0, str(_PROJECT_ROOT))
 from src.data_pipeline.cleaner import clean_contractor_names, expand_multi_contractors  # noqa: E402
@@ -79,6 +80,49 @@ def _load_data() -> pd.DataFrame:
     return df
 
 
+@st.cache_data
+def _load_groups() -> dict:
+    try:
+        with open(_GROUPS_PATH, encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {'categories': []}
+
+
+def _assign_category(name: str, categories: list[dict]) -> str:
+    """contractor_name にカテゴリを割り当てる。
+
+    Pass1: 全カテゴリの members を先にチェック（prefix より優先）。
+    Pass2: 定義順で prefixes → suffixes をチェック。
+    該当なし: 'その他' を返す。
+    """
+    for cat in categories:
+        if name in set(cat.get('members', [])):
+            return cat['name']
+    for cat in categories:
+        for prefix in cat.get('prefixes', []):
+            if name.startswith(prefix):
+                return cat['name']
+        for suffix in cat.get('suffixes', []):
+            if suffix in name:
+                return cat['name']
+    return 'その他'
+
+
+def _assign_subgroup(name: str, categories: list[dict]) -> str:
+    """コンサルティング・シンクタンクはサブグループに分割、それ以外は _assign_category と同じ。"""
+    category = _assign_category(name, categories)
+    if category != 'コンサルティング・シンクタンク':
+        return category
+    for cat in categories:
+        if cat['name'] == 'コンサルティング・シンクタンク':
+            for sg in cat.get('subgroups', []):
+                if name in set(sg.get('members', [])):
+                    return sg['name']
+            return 'コンサルティング（その他）'
+    return 'その他'
+
+
 df = _load_data()
 
 if df.empty:
@@ -107,19 +151,26 @@ with st.sidebar:
 
     filtered = base[base['fiscal_year'].isin(selected_years)]
 
-    top_contractors = (
-        filtered.groupby('contractor_name')
-        .size()
-        .sort_values(ascending=False)
-        .head(10)
-        .index.tolist()
-    )
-    all_contractors = sorted(filtered['contractor_name'].unique().tolist())
-    selected_contractors = st.multiselect(
-        '委託事業者（複数選択可）',
-        options=all_contractors,
-        default=top_contractors,
-    )
+    st.divider()
+    group_mode = st.toggle('カテゴリ別グループ表示', value=False)
+    subgroup_mode = False
+    if group_mode:
+        subgroup_mode = st.toggle('コンサル系サブグループ表示', value=False)
+
+    if not group_mode:
+        top_contractors = (
+            filtered.groupby('contractor_name')
+            .size()
+            .sort_values(ascending=False)
+            .head(10)
+            .index.tolist()
+        )
+        all_contractors = sorted(filtered['contractor_name'].unique().tolist())
+        selected_contractors = st.multiselect(
+            '委託事業者（複数選択可）',
+            options=all_contractors,
+            default=top_contractors,
+        )
 
     st.divider()
     if st.button('ログアウト'):
@@ -130,58 +181,98 @@ with st.sidebar:
 # --- メインコンテンツ ---
 
 st.title('官公庁委託調査ダッシュボード')
-st.caption(
-    f'省庁: {selected_ministry}　／　'
-    f'対象年度: {len(selected_years)} 年度　／　'
-    f'対象事業者: {len(selected_contractors)} 社'
-)
 
 if not selected_years:
     st.warning('対象年度を1年度以上選択してください')
     st.stop()
 
-if not selected_contractors:
-    st.warning('事業者を1社以上選択してください')
-    st.stop()
+if group_mode:
+    caption_suffix = 'コンサル系サブグループ表示' if subgroup_mode else 'カテゴリ別グループ表示'
+    st.caption(
+        f'省庁: {selected_ministry}　／　'
+        f'対象年度: {len(selected_years)} 年度　／　{caption_suffix}'
+    )
 
-agg = (
-    filtered[filtered['contractor_name'].isin(selected_contractors)]
-    .groupby(['fiscal_year', 'contractor_name'])
-    .size()
-    .reset_index(name='件数')
-)
+    categories = _load_groups().get('categories', [])
+    work = filtered.copy()
+    if subgroup_mode:
+        work['_group'] = work['contractor_name'].apply(
+            lambda x: _assign_subgroup(x, categories)
+        )
+        group_label = 'グループ'
+        chart_title = 'コンサル系サブグループ別 年度別受託件数の推移'
+    else:
+        work['_group'] = work['contractor_name'].apply(
+            lambda x: _assign_category(x, categories)
+        )
+        group_label = 'カテゴリ'
+        chart_title = 'カテゴリ別 年度別受託件数の推移'
+    group_col = '_group'
+    all_groups = sorted(work[group_col].unique().tolist())
 
-# 0件の年度もプロットして線で結ぶため、年度×事業者の直積で 0 埋めする
-idx = pd.MultiIndex.from_product(
-    [selected_years, selected_contractors],
-    names=['fiscal_year', 'contractor_name'],
-)
+    agg = (
+        work.groupby(['fiscal_year', group_col])
+        .size()
+        .reset_index(name='件数')
+    )
+    idx = pd.MultiIndex.from_product(
+        [selected_years, all_groups],
+        names=['fiscal_year', group_col],
+    )
+
+else:
+    if not selected_contractors:
+        st.warning('事業者を1社以上選択してください')
+        st.stop()
+
+    st.caption(
+        f'省庁: {selected_ministry}　／　'
+        f'対象年度: {len(selected_years)} 年度　／　'
+        f'対象事業者: {len(selected_contractors)} 社'
+    )
+
+    group_col = 'contractor_name'
+    group_label = '委託事業者'
+
+    agg = (
+        filtered[filtered['contractor_name'].isin(selected_contractors)]
+        .groupby(['fiscal_year', 'contractor_name'])
+        .size()
+        .reset_index(name='件数')
+    )
+    idx = pd.MultiIndex.from_product(
+        [selected_years, selected_contractors],
+        names=['fiscal_year', 'contractor_name'],
+    )
+    chart_title = '委託事業者別 年度別受託件数の推移'
+
+# 0件の年度もプロットして線で結ぶため、年度×グループの直積で 0 埋めする
 chart_df = (
-    agg.set_index(['fiscal_year', 'contractor_name'])
+    agg.set_index(['fiscal_year', group_col])
     .reindex(idx, fill_value=0)
     .reset_index()
-    .sort_values(['contractor_name', 'fiscal_year'])
+    .sort_values([group_col, 'fiscal_year'])
 )
 
 fig = px.line(
     chart_df,
     x='fiscal_year',
     y='件数',
-    color='contractor_name',
+    color=group_col,
     markers=True,
-    title='委託事業者別 年度別受託件数の推移',
-    labels={'fiscal_year': '年度', 'contractor_name': '委託事業者'},
+    title=chart_title,
+    labels={'fiscal_year': '年度', group_col: group_label},
 )
 fig.update_xaxes(dtick=1, tickformat='d')
-fig.update_layout(legend_title_text='委託事業者')
+fig.update_layout(legend_title_text=group_label)
 st.plotly_chart(fig, use_container_width=True)
 
 with st.expander('集計データを表示'):
     pivot = (
-        chart_df.pivot(index='contractor_name', columns='fiscal_year', values='件数')
+        chart_df.pivot(index=group_col, columns='fiscal_year', values='件数')
         .fillna(0)
         .astype(int)
     )
-    pivot.index.name = '委託事業者'
+    pivot.index.name = group_label
     pivot.columns.name = '年度'
     st.dataframe(pivot, use_container_width=True)
