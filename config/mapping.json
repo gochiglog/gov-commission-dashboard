@@ -1,4 +1,28 @@
 {
-  "_comment": "正規化後も残る特殊な表記ゆれを吸収するマッピング辞書。キーは cleaner.py の正規化アルゴリズム適用後の文字列、値は統一後の名称。",
-  "mappings": {}
+  "_comment": "正規化後も残る特殊な表記ゆれを吸収するマッピング辞書。キーは cleaner.py の正規化アルゴリズム適用後の文字列、値は統一後の表示名。",
+  "mappings": {
+    "EYストラテジー・アンド・コンサルティング": "EYストラテジーアンドコンサルティング",
+    "アーサー・ディ・リトルジャパン": "アーサー・ディ・リトル・ジャパン",
+    "ボストンコンサルティンググループ": "ボストン・コンサルティング・グループ",
+    "ボストンコンサルティンググループ合同会社": "ボストン・コンサルティング・グループ",
+    "ボストンコンサルティング・グループ合同会社": "ボストン・コンサルティング・グループ",
+    "ボストン・コンサルティング・グループ合同会社": "ボストン・コンサルティング・グループ",
+    "ボストン・コンサルティング・グループ合弁会社": "ボストン・コンサルティング・グループ",
+    "有限会社あずさ監査法人": "有限責任あずさ監査法人",
+    "PwCコンサルティング合同会社・PwC弁護士法人・PwC税理士法人": "PwCコンサルティング合同会社,PwC弁護士法人,PwC税理士法人",
+    "オリエンタルコンサルタンツグローバル": "オリエンタルコンサルタンツ",
+    "オリエンタルコンサルタンツグローバル日本製鉄": "オリエンタルコンサルタンツ",
+    "NomuraResearchInstituteConsultingandSolutionsIndiaPrivateLimited(野村総研インド)": "野村総合研究所",
+    "NomuraResearchInstituteConsultingandSolutionsIndiaPrivateLimited": "野村総合研究所",
+    "NomuraResearchInstituteConsultingandSolutionsIndiaPvt.Ltd.": "野村総合研究所",
+    "NomuraResearchInstituteConsulting&SolutionsIndiaPrivateLimited": "野村総合研究所",
+    "NomuraResearchInstituteConsulting&SolutionsIndiaPvt.Ltd.": "野村総合研究所",
+    "NomuraResearchInstituteConsulting&SolutionsIndiaPvt.Ltd": "野村総合研究所",
+    "NomuraResearchInstituteConsulting&SolutionsIndiaPVTLTD(野村総研インド)": "野村総合研究所",
+    "NomuraResearchInstituteSingaporePte.Ltd.": "野村総合研究所",
+    "NomuraResearchInstituteSingaporePteLtd.": "野村総合研究所",
+    "NomuraResearchInstituteTaiwanCo.": "野村総合研究所",
+    "NRIConsulting&Solutions(Thailand)Co.": "野村総合研究所",
+    "NOMURARESEARCHINSTITUTECONSULTINGANDSOLUTIONSINDIAPRIVATELIMITED": "野村総合研究所"
+  }
 }
