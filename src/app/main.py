@@ -109,6 +109,20 @@ def _assign_category(name: str, categories: list[dict]) -> str:
     return 'その他'
 
 
+def _assign_subgroup(name: str, categories: list[dict]) -> str:
+    """コンサルティング・シンクタンクはサブグループに分割、それ以外は _assign_category と同じ。"""
+    category = _assign_category(name, categories)
+    if category != 'コンサルティング・シンクタンク':
+        return category
+    for cat in categories:
+        if cat['name'] == 'コンサルティング・シンクタンク':
+            for sg in cat.get('subgroups', []):
+                if name in set(sg.get('members', [])):
+                    return sg['name']
+            return 'コンサルティング（その他）'
+    return 'その他'
+
+
 df = _load_data()
 
 if df.empty:
@@ -139,6 +153,9 @@ with st.sidebar:
 
     st.divider()
     group_mode = st.toggle('カテゴリ別グループ表示', value=False)
+    subgroup_mode = False
+    if group_mode:
+        subgroup_mode = st.toggle('コンサル系サブグループ表示', value=False)
 
     if not group_mode:
         top_contractors = (
@@ -170,18 +187,27 @@ if not selected_years:
     st.stop()
 
 if group_mode:
+    caption_suffix = 'コンサル系サブグループ表示' if subgroup_mode else 'カテゴリ別グループ表示'
     st.caption(
         f'省庁: {selected_ministry}　／　'
-        f'対象年度: {len(selected_years)} 年度　／　カテゴリ別グループ表示'
+        f'対象年度: {len(selected_years)} 年度　／　{caption_suffix}'
     )
 
     categories = _load_groups().get('categories', [])
     work = filtered.copy()
-    work['_group'] = work['contractor_name'].apply(
-        lambda x: _assign_category(x, categories)
-    )
+    if subgroup_mode:
+        work['_group'] = work['contractor_name'].apply(
+            lambda x: _assign_subgroup(x, categories)
+        )
+        group_label = 'グループ'
+        chart_title = 'コンサル系サブグループ別 年度別受託件数の推移'
+    else:
+        work['_group'] = work['contractor_name'].apply(
+            lambda x: _assign_category(x, categories)
+        )
+        group_label = 'カテゴリ'
+        chart_title = 'カテゴリ別 年度別受託件数の推移'
     group_col = '_group'
-    group_label = 'カテゴリ'
     all_groups = sorted(work[group_col].unique().tolist())
 
     agg = (
@@ -193,7 +219,6 @@ if group_mode:
         [selected_years, all_groups],
         names=['fiscal_year', group_col],
     )
-    chart_title = 'カテゴリ別 年度別受託件数の推移'
 
 else:
     if not selected_contractors:
