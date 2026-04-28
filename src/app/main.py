@@ -166,10 +166,18 @@ with st.sidebar:
             .index.tolist()
         )
         all_contractors = sorted(filtered['contractor_name'].unique().tolist())
+
+        # 省庁が変わったら選択状態をリセット
+        if st.session_state.get('_last_ministry') != selected_ministry:
+            st.session_state['_last_ministry'] = selected_ministry
+            st.session_state.pop('contractor_select', None)
+
         selected_contractors = st.multiselect(
-            '委託事業者（複数選択可）',
+            '委託事業者（複数選択可、入力で検索）',
             options=all_contractors,
             default=top_contractors,
+            key='contractor_select',
+            placeholder='事業者名を入力して絞り込み...',
         )
 
     st.divider()
