@@ -12,7 +12,7 @@ _DB_PATH = _PROJECT_ROOT / 'data' / 'processed' / 'gov_commission.sqlite'
 _AUTH_PATH = _PROJECT_ROOT / 'config' / 'auth.json'
 
 sys.path.insert(0, str(_PROJECT_ROOT))
-from src.data_pipeline.cleaner import clean_contractor_names  # noqa: E402
+from src.data_pipeline.cleaner import clean_contractor_names, expand_multi_contractors  # noqa: E402
 
 # データ不足のためデフォルトで非表示にする年度
 _DEFAULT_HIDDEN_YEARS = {2021}
@@ -66,6 +66,8 @@ def _load_data() -> pd.DataFrame:
     df['publish_date'] = pd.to_datetime(df['publish_date'])
     # ETL 後に追加された mapping.json の正規化ルールを反映
     df['contractor_name'] = clean_contractor_names(df['contractor_name'])
+    # 連名行（コンマ区切り）を 1 社 1 行に展開（ETL 実行前の旧データへの対応も兼ねる）
+    df = expand_multi_contractors(df)
     # 年度を導出（4月始まり: 4月〜翌3月を同一年度とする）
     df['fiscal_year'] = df['publish_date'].apply(
         lambda d: d.year if d.month >= 4 else d.year - 1
