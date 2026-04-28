@@ -17,6 +17,7 @@ from src.data_pipeline.cleaner import clean_contractor_names, expand_multi_contr
 
 # データ不足のためデフォルトで非表示にする年度
 _DEFAULT_HIDDEN_YEARS = {2021}
+_TOTAL_LABEL = '全事業者合計'
 
 st.set_page_config(page_title='官公庁委託調査ダッシュボード', layout='wide')
 
@@ -174,7 +175,7 @@ with st.sidebar:
 
         selected_contractors = st.multiselect(
             '委託事業者（複数選択可、入力で検索）',
-            options=all_contractors,
+            options=[_TOTAL_LABEL] + all_contractors,
             default=top_contractors,
             key='contractor_select',
             placeholder='事業者名を入力して絞り込み...',
@@ -229,27 +230,47 @@ if group_mode:
     )
 
 else:
-    if not selected_contractors:
+    show_total = _TOTAL_LABEL in selected_contractors
+    real_contractors = [c for c in selected_contractors if c != _TOTAL_LABEL]
+
+    if not real_contractors and not show_total:
         st.warning('事業者を1社以上選択してください')
         st.stop()
 
-    st.caption(
-        f'省庁: {selected_ministry}　／　'
-        f'対象年度: {len(selected_years)} 年度　／　'
-        f'対象事業者: {len(selected_contractors)} 社'
-    )
+    caption_parts = [
+        f'省庁: {selected_ministry}',
+        f'対象年度: {len(selected_years)} 年度',
+    ]
+    if real_contractors:
+        caption_parts.append(f'対象事業者: {len(real_contractors)} 社')
+    if show_total:
+        caption_parts.append(_TOTAL_LABEL)
+    st.caption('　／　'.join(caption_parts))
 
     group_col = 'contractor_name'
     group_label = '委託事業者'
 
-    agg = (
-        filtered[filtered['contractor_name'].isin(selected_contractors)]
-        .groupby(['fiscal_year', 'contractor_name'])
-        .size()
-        .reset_index(name='件数')
-    )
+    frames = []
+    if real_contractors:
+        frames.append(
+            filtered[filtered['contractor_name'].isin(real_contractors)]
+            .groupby(['fiscal_year', 'contractor_name'])
+            .size()
+            .reset_index(name='件数')
+        )
+    if show_total:
+        total_per_year = (
+            filtered.groupby('fiscal_year')
+            .size()
+            .reset_index(name='件数')
+        )
+        total_per_year['contractor_name'] = _TOTAL_LABEL
+        frames.append(total_per_year)
+
+    agg = pd.concat(frames, ignore_index=True)
+    all_for_idx = real_contractors + ([_TOTAL_LABEL] if show_total else [])
     idx = pd.MultiIndex.from_product(
-        [selected_years, selected_contractors],
+        [selected_years, all_for_idx],
         names=['fiscal_year', 'contractor_name'],
     )
     chart_title = '委託事業者別 年度別受託件数の推移'

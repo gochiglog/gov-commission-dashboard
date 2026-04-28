@@ -111,6 +111,10 @@ else:
     year = int(selected_period.replace('年度', ''))
     target = base[base['fiscal_year'] == year]
 
+col1, col2 = st.columns(2)
+col1.metric('期間内の総受託件数', f'{len(target):,} 件')
+col2.metric('ユニーク事業者数', f'{target["contractor_name"].nunique():,} 社')
+
 ranking = (
     target.groupby('contractor_name')
     .size()
