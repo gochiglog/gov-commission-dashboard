@@ -1,73 +1,105 @@
-# 官公庁委託調査ダッシュボード (Gov-Commission-Dashboard)
+# 官公庁委託調査ダッシュボード
 
-## 概要
-官公庁（主に国）が民間企業等に発注する「委託調査」の案件数および委託先の時系列推移を可視化するWebダッシュボードアプリケーション。
-第一フェーズとして、比較的データが整備されている「経済産業省」のデータから着手し、将来的には他省庁（国交省、厚労省など）のデータ統合を目指す。
+官公庁が民間企業に発注する「委託調査」の受託件数・受託事業者の時系列推移を可視化するWebダッシュボード。
+現フェーズは経済産業省データに対応。招待制のID/Password認証でアクセスを管理する。
 
-利用者はnote等のプラットフォーム経由でアクセス権（ID/Password）を取得し、本ダッシュボードを閲覧することを想定している。
+**本番URL:** https://gov-commission-dashboard.onrender.com
 
-## 開発方針（AIエージェント主導開発）
-本プロジェクトは、機能開発において「極力自身でコードを書かない」ことをポリシーとする。
-- **Claude Code:** ターミナル上で動作させ、要件の読み込み、プロジェクト全体の構造把握、自律的なファイル生成・コーディングの主力として活用。
-- **GitHub Copilot (Agentモード):** VS Code上でのコード補完、インライン修正指示、リファクタリング等のサポート。
-- **Issue Driven Development:** `main` ブランチへの直接コミットは禁止。必ずGitHub Issueを作成し、Issue単位で作業ブランチを切って開発を進める。
+---
 
-## 技術スタック（予定）
-- **言語:** Python 3.10+
-- **データ処理:** pandas, openpyxl
-- **データベース:** SQLite (初期フェーズ) -> 将来的にPostgreSQL等への移行を検討
-- **フロントエンド/Webフレームワーク:** Streamlit (高速なプロトタイピングと可視化のため)
-- **インフラ/デプロイ:** Render または Streamlit Community Cloud (予定)
-- **CI/CD:** GitHub Actions (Lint, Format, 自動テスト)
+## 機能一覧
 
-## 想定機能
-1. **時系列推移の可視化 (折れ線グラフ)**
-   - 横軸: 年度
-   - 縦軸: 案件数
-   - 折れ線: 委託事業者名
-2. **選択・フィルタリング機能**
-   - 表示する省庁の指定 (初期は経産省のみ)
-   - グラフに表示する委託事業者の選択機能
-3. **認証機能**
-   - 許可されたユーザーのみがアクセスできる簡易的なID/Password認証画面
+| 機能 | 説明 |
+|---|---|
+| 時系列折れ線グラフ | 年度別受託件数の推移を事業者・カテゴリ別に表示 |
+| 件数 / シェア(%) 切り替え | 絶対値と省庁全体に占める割合を切り替え表示 |
+| カテゴリ別グループ表示 | 事業者をカテゴリ（コンサル・ITベンダー等）に分類して集計 |
+| コンサル系サブグループ表示 | コンサル系をさらにグローバル・Big4・国内系等に細分化 |
+| 事業者絞り込み検索 | multiselect に直接入力して候補を動的に絞り込み |
+| TOP受託事業者ランキング | 期間・省庁別のランキングテーブルと集計メトリクス |
+| 招待トークン式ユーザー登録 | 招待URL経由でメールアドレスを入力するとID/PWを発行 |
 
-## システムアーキテクチャ・データフロー
-プロジェクトは大きく「データ成形パイプライン」と「可視化アプリケーション」に分割される。
+---
 
-### 1. データ成形パイプライン (ETL)
-`Raw Data (Excel)` -> `Data Cleaning Script` -> `Database (SQLite)`
+## 技術スタック
 
-- **データソース:** 各省庁HPから手動ダウンロードしたExcelファイル
-- **ファイル命名規則:** `YYYY_省庁略称` (例: `2026_METI.xlsx`)
-- **クレンジングの重要要件 (名寄せ):** 「みずほリサーチ&テクノロジーズ」等の表記揺れが多数存在するため、外部辞書（JSON等）を用いたキーワードマッチングにより、事業者名を「理想形」に統一する処理を必ず挟む。
+| 用途 | 技術 |
+|---|---|
+| Webアプリ | Python 3.10+, Streamlit |
+| データ処理 | pandas, openpyxl |
+| データベース（案件データ） | SQLite（Gitで管理・読み取り専用） |
+| データベース（ユーザー管理） | Supabase（PostgreSQL, 無料プラン） |
+| メール送信 | Resend |
+| ホスティング | Render（無料プラン） |
 
-### 2. 将来の拡張を見据えた設計上の注意点
-- **省庁によるフォーマットの差異:** 経産省のデータは例外的に横断統合されており扱いやすい。しかし、他省庁は「各局ごと」に分散しており、備品購入等の無関係なデータが混在している。
-- **疎結合な設計:** 経産省フォーマットに完全依存した作り込みは避け、各省庁の生データを共通の「理想とするDBスキーマ」に変換する中間層（Adapter）を設ける設計とすること。
+---
 
-## 理想とするデータベース項目
-| カラム名 | 型 | 説明 |
-| :--- | :--- | :--- |
-| `ministry` | String | 省庁名（METI, MLIT等） |
-| `publish_date` | Date | 掲載日（西暦変換済み） |
-| `report_title` | String | 委託調査報告書名 |
-| `contractor_name` | String | 委託事業者名（名寄せ・統一済み） |
-| `department` | String | 担当課室名 |
-| `url` | String | HPアドレス |
+## ディレクトリ構成
 
-## ディレクトリ構成（案）
-```text
+```
 .
-├── .github/          # GitHub Actions ワークフロー
+├── .github/
+│   ├── instructions/       # Issue / PR / コミットの記述ルール
+│   └── commit.instructions.md
+├── config/
+│   ├── mapping.json        # 事業者名の名寄せ辞書
+│   └── groups.json         # カテゴリ・サブグループ定義
 ├── data/
-│   ├── raw/          # 生のExcel/CSVファイル (Git管理外を推奨)
-│   └── processed/    # 整形済みのSQLite DBなど
+│   ├── raw/                # 生のExcelファイル（Git管理外）
+│   └── processed/
+│       └── gov_commission.sqlite   # 整形済みデータ（Git管理）
 ├── src/
-│   ├── data_pipeline/ # データ抽出・整形スクリプト
-│   │   ├── parsers/   # 省庁別パーサー (meti_parser.py 等)
-│   │   └── cleaner.py # 名寄せ・クレンジング処理
-│   ├── app/           # Streamlit ダッシュボードアプリ
-│   └── utils/         # 共通ユーティリティ (和暦西暦変換など)
-├── config/            # 名寄せ辞書(mapping.json)や設定ファイル
-├── requirements.txt  # 依存パッケージ
+│   ├── data_pipeline/
+│   │   ├── parsers/        # 省庁別パーサー（meti_parser.py 等）
+│   │   ├── cleaner.py      # 名寄せ・クレンジング処理
+│   │   └── user_store.py   # ユーザー登録・認証（Supabase / SQLite）
+│   ├── app/
+│   │   ├── main.py         # メインダッシュボード
+│   │   └── pages/
+│   │       ├── 01_top_ranking.py   # TOPランキングページ
+│   │       └── 02_signup.py        # 招待登録ページ
+│   └── utils/              # 共通ユーティリティ
+├── render.yaml             # Render デプロイ設定
+├── requirements.txt
 └── README.md
+```
+
+---
+
+## ローカル開発
+
+```bash
+# 依存パッケージのインストール
+pip install -r requirements.txt
+
+# アプリ起動
+streamlit run src/app/main.py
+
+# 経産省データのETL実行
+python src/data_pipeline/parsers/meti_parser.py
+```
+
+ローカルでの認証は `config/auth.json`（`auth.json.example` をコピーして作成）を使用する。
+Render本番環境では環境変数 `ADMIN_USERNAME` / `ADMIN_PASSWORD` が優先される。
+
+---
+
+## 環境変数（Render）
+
+| 変数名 | 用途 |
+|---|---|
+| `ADMIN_USERNAME` | 管理者ログインID |
+| `ADMIN_PASSWORD` | 管理者ログインパスワード |
+| `INVITE_TOKEN` | 招待URL用トークン（`?invite=TOKEN`） |
+| `RESEND_API_KEY` | Resend メール送信APIキー |
+| `RESEND_FROM_EMAIL` | 送信元メールアドレス |
+| `SUPABASE_URL` | Supabase プロジェクトURL |
+| `SUPABASE_KEY` | Supabase service_role キー |
+
+---
+
+## 開発ルール
+
+- `main` への直接コミット禁止。必ず `feature/issue-{番号}` ブランチを切ること
+- Issue / PR / コミットの書式は `.github/instructions/` 内の各ルールに従う
+- 省庁固有のロジックは `src/data_pipeline/parsers/` に閉じ込め、共通スキーマへの変換を担う Adapter パターンを維持する
