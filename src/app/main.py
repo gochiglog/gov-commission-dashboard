@@ -297,14 +297,29 @@ chart_df = (
     .sort_values([group_col, 'fiscal_year'])
 )
 
+# 省庁全体の年度別件数を分母としてシェア(%)を計算
+year_totals = filtered.groupby('fiscal_year').size().reset_index(name='_total')
+chart_df = chart_df.merge(year_totals, on='fiscal_year', how='left')
+chart_df['シェア(%)'] = (chart_df['件数'] / chart_df['_total'] * 100).round(1).fillna(0)
+
+# 表示形式の切り替え
+display_mode = st.radio('表示形式', ['件数', 'シェア(%)'], horizontal=True)
+
+if display_mode == 'シェア(%)':
+    y_col = 'シェア(%)'
+    plot_title = chart_title.replace('受託件数', '受託シェア(%)')
+else:
+    y_col = '件数'
+    plot_title = chart_title
+
 fig = px.line(
     chart_df,
     x='fiscal_year',
-    y='件数',
+    y=y_col,
     color=group_col,
     markers=True,
-    title=chart_title,
-    labels={'fiscal_year': '年度', group_col: group_label},
+    title=plot_title,
+    labels={'fiscal_year': '年度', group_col: group_label, y_col: y_col},
 )
 fig.update_xaxes(dtick=1, tickformat='d')
 fig.update_layout(legend_title_text=group_label)
@@ -312,10 +327,11 @@ st.plotly_chart(fig, use_container_width=True)
 
 with st.expander('集計データを表示'):
     pivot = (
-        chart_df.pivot(index=group_col, columns='fiscal_year', values='件数')
+        chart_df.pivot(index=group_col, columns='fiscal_year', values=y_col)
         .fillna(0)
-        .astype(int)
     )
+    if display_mode == '件数':
+        pivot = pivot.astype(int)
     pivot.index.name = group_label
     pivot.columns.name = '年度'
     st.dataframe(pivot, use_container_width=True)
