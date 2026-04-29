@@ -33,7 +33,8 @@ def _send_credentials(to_email: str, username: str, password: str) -> bool:
                 f'<tr><td>ユーザーID</td><td><strong>{username}</strong></td></tr>'
                 f'<tr><td>パスワード</td><td><strong>{password}</strong></td></tr>'
                 '</table>'
-                f'<br><p>ダッシュボード: <a href="{_DASHBOARD_URL}">{_DASHBOARD_URL}</a></p>'
+                f'<br><p>上記のユーザーIDとパスワードを使って、以下のURLからログインしてください。</p>'
+                f'<p><a href="{_DASHBOARD_URL}">{_DASHBOARD_URL}</a></p>'
                 '<p><small>このメールに心当たりがない場合は無視してください。</small></p>'
             ),
         })
