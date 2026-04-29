@@ -1,5 +1,8 @@
 import os
+import smtplib
 import sys
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 
 import streamlit as st
@@ -7,37 +10,38 @@ import streamlit as st
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.data_pipeline.user_store import add_user, email_exists, generate_credentials  # noqa: E402
+from src.data_pipeline.user_store import add_user, delete_user, email_exists, generate_credentials  # noqa: E402
 
 st.set_page_config(page_title='ユーザー登録', layout='centered')
 
 _DASHBOARD_URL = 'https://gov-commission-dashboard.onrender.com'
-_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
 
 
 def _send_credentials(to_email: str, username: str, password: str) -> bool:
-    api_key = os.environ.get('RESEND_API_KEY', '')
-    if not api_key:
+    gmail_user = os.environ.get('GMAIL_USER', '')
+    gmail_app_password = os.environ.get('GMAIL_APP_PASSWORD', '')
+    if not gmail_user or not gmail_app_password:
         return False
     try:
-        import resend
-        resend.api_key = api_key
-        resend.Emails.send({
-            'from': _FROM_EMAIL,
-            'to': [to_email],
-            'subject': '【官公庁委託調査ダッシュボード】ログイン情報',
-            'html': (
-                '<p>官公庁委託調査ダッシュボードへのご登録ありがとうございます。</p>'
-                '<p>以下のログイン情報でアクセスできます。</p>'
-                '<table border="0" cellpadding="6">'
-                f'<tr><td>ユーザーID</td><td><strong>{username}</strong></td></tr>'
-                f'<tr><td>パスワード</td><td><strong>{password}</strong></td></tr>'
-                '</table>'
-                f'<br><p>上記のユーザーIDとパスワードを使って、以下のURLからログインしてください。</p>'
-                f'<p><a href="{_DASHBOARD_URL}">{_DASHBOARD_URL}</a></p>'
-                '<p><small>このメールに心当たりがない場合は無視してください。</small></p>'
-            ),
-        })
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = '【官公庁委託調査ダッシュボード】ログイン情報'
+        msg['From'] = gmail_user
+        msg['To'] = to_email
+        html = (
+            '<p>官公庁委託調査ダッシュボードへのご登録ありがとうございます。</p>'
+            '<p>以下のログイン情報でアクセスできます。</p>'
+            '<table border="0" cellpadding="6">'
+            f'<tr><td>ユーザーID</td><td><strong>{username}</strong></td></tr>'
+            f'<tr><td>パスワード</td><td><strong>{password}</strong></td></tr>'
+            '</table>'
+            '<br><p>上記のユーザーIDとパスワードを使って、以下のURLからログインしてください。</p>'
+            f'<p><a href="{_DASHBOARD_URL}">{_DASHBOARD_URL}</a></p>'
+            '<p><small>このメールに心当たりがない場合は無視してください。</small></p>'
+        )
+        msg.attach(MIMEText(html, 'html'))
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(gmail_user, gmail_app_password)
+            server.sendmail(gmail_user, to_email, msg.as_string())
         return True
     except Exception:
         return False
@@ -79,5 +83,9 @@ if submitted:
         if _send_credentials(email, username, password):
             st.success(f'{email} にログイン情報をお送りしました。メールをご確認ください。')
         else:
-            st.warning('メール送信に失敗しました（RESEND_API_KEY を確認してください）。以下のログイン情報を直接お使いください。')
-            st.code(f'ユーザーID: {username}\nパスワード: {password}')
+            # メール送信失敗時はユーザーを削除してロールバック
+            delete_user(email)
+            st.error(
+                'メール送信に失敗しました。しばらく待ってから再度お試しください。'
+                '問題が続く場合は管理者にお問い合わせください。'
+            )

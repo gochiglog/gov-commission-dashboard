@@ -94,3 +94,14 @@ def email_exists(email: str) -> bool:
         row = conn.execute('SELECT 1 FROM users WHERE email = ?', (email,)).fetchone()
         conn.close()
         return row is not None
+
+
+def delete_user(email: str) -> None:
+    client = _supabase()
+    if client:
+        client.table('users').delete().eq('email', email).execute()
+    else:
+        conn = _sqlite_conn()
+        conn.execute('DELETE FROM users WHERE email = ?', (email,))
+        conn.commit()
+        conn.close()
