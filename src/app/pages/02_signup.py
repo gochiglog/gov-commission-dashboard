@@ -17,11 +17,11 @@ st.set_page_config(page_title='ユーザー登録', layout='centered')
 _DASHBOARD_URL = 'https://gov-commission-dashboard.onrender.com'
 
 
-def _send_credentials(to_email: str, username: str, password: str) -> bool:
+def _send_credentials(to_email: str, username: str, password: str) -> tuple[bool, str]:
     gmail_user = os.environ.get('GMAIL_USER', '')
     gmail_app_password = os.environ.get('GMAIL_APP_PASSWORD', '')
     if not gmail_user or not gmail_app_password:
-        return False
+        return False, f'環境変数未設定 (GMAIL_USER={"OK" if gmail_user else "未設定"}, GMAIL_APP_PASSWORD={"OK" if gmail_app_password else "未設定"})'
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = '【官公庁委託調査ダッシュボード】ログイン情報'
@@ -42,9 +42,9 @@ def _send_credentials(to_email: str, username: str, password: str) -> bool:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(gmail_user, gmail_app_password)
             server.sendmail(gmail_user, to_email, msg.as_string())
-        return True
-    except Exception:
-        return False
+        return True, ''
+    except Exception as e:
+        return False, str(e)
 
 
 st.title('ユーザー登録')
@@ -80,12 +80,10 @@ if submitted:
             st.error(f'ユーザー登録に失敗しました: {e}')
             st.stop()
 
-        if _send_credentials(email, username, password):
+        ok, err = _send_credentials(email, username, password)
+        if ok:
             st.success(f'{email} にログイン情報をお送りしました。メールをご確認ください。')
         else:
             # メール送信失敗時はユーザーを削除してロールバック
             delete_user(email)
-            st.error(
-                'メール送信に失敗しました。しばらく待ってから再度お試しください。'
-                '問題が続く場合は管理者にお問い合わせください。'
-            )
+            st.error(f'メール送信に失敗しました。【デバッグ情報】{err}')
