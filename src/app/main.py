@@ -26,11 +26,19 @@ st.set_page_config(page_title='官公庁委託調査ダッシュボード', layo
 # --- 認証 ---
 
 def _authenticate(username: str, password: str) -> bool:
-    # Render 環境変数が設定されていれば優先して使用する
+    # 管理者アカウント（環境変数）
     env_user = os.environ.get('ADMIN_USERNAME')
     env_pass = os.environ.get('ADMIN_PASSWORD')
-    if env_user and env_pass:
-        return username == env_user and password == env_pass
+    if env_user and env_pass and username == env_user and password == env_pass:
+        return True
+    # 登録ユーザー（SQLite）
+    try:
+        from src.data_pipeline.user_store import authenticate_user
+        if authenticate_user(username, password):
+            return True
+    except Exception:
+        pass
+    # レガシー（auth.json）
     try:
         with open(_AUTH_PATH, encoding='utf-8') as f:
             users = json.load(f).get('users', {})
