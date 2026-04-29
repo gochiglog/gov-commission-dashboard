@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -19,6 +20,10 @@ st.set_page_config(page_title='TOP ランキング', layout='wide')
 # --- 認証 ---
 
 def _authenticate(username: str, password: str) -> bool:
+    env_user = os.environ.get('ADMIN_USERNAME')
+    env_pass = os.environ.get('ADMIN_PASSWORD')
+    if env_user and env_pass:
+        return username == env_user and password == env_pass
     try:
         with open(_AUTH_PATH, encoding='utf-8') as f:
             users = json.load(f).get('users', {})
