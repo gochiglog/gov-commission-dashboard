@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: gov-commission-dashboard
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run src/app/main.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: INVITE_TOKEN
+        sync: false
