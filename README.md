@@ -5,6 +5,8 @@
 
 **本番URL:** https://gov-commission-dashboard.onrender.com
 
+> **推奨環境:** PCブラウザ（Chrome / Safari）。スマートフォンでは表示が崩れる場合があります。
+
 ---
 
 ## 機能一覧
@@ -17,7 +19,40 @@
 | コンサル系サブグループ表示 | コンサル系をさらにグローバル・Big4・国内系等に細分化 |
 | 事業者絞り込み検索 | multiselect に直接入力して候補を動的に絞り込み |
 | TOP受託事業者ランキング | 期間・省庁別のランキングテーブルと集計メトリクス |
-| 招待トークン式ユーザー登録 | 招待URL経由でメールアドレスを入力するとID/PWを発行 |
+| 招待トークン式ユーザー登録 | 招待URL経由でメールアドレスとパスワードを自分で設定して登録 |
+
+---
+
+## アーキテクチャ
+
+```mermaid
+graph TB
+    subgraph USER["ユーザー（PC推奨）"]
+        B[ブラウザ]
+    end
+
+    subgraph RENDER["Render（Free Plan）"]
+        APP["Streamlit アプリ\nsrc/app/main.py\n01_top_ranking.py\n02_signup.py"]
+    end
+
+    subgraph DATA["データ層"]
+        DB[("SQLite\ngov_commission.sqlite\n案件データ・Git管理")]
+        SB[("Supabase\nPostgreSQL\nユーザー管理")]
+    end
+
+    subgraph OPS["運用"]
+        GH["GitHub\ngochiglog/\ngov-commission-dashboard"]
+        CRON["cron-job.org\n15分ごとにPing"]
+        ETL["ETL スクリプト\nmeti_parser.py\n（手動実行）"]
+    end
+
+    B -- "HTTPS" --> APP
+    APP --> DB
+    APP --> SB
+    GH -- "main push →\n自動デプロイ" --> RENDER
+    CRON -- "GET /\nスリープ防止" --> APP
+    ETL -- "SQLite更新→\ngit push" --> GH
+```
 
 ---
 
@@ -29,8 +64,8 @@
 | データ処理 | pandas, openpyxl |
 | データベース（案件データ） | SQLite（Gitで管理・読み取り専用） |
 | データベース（ユーザー管理） | Supabase（PostgreSQL, 無料プラン） |
-| メール送信 | 不要（ユーザーが自分でパスワード設定） |
 | ホスティング | Render（無料プラン） |
+| コールドスタート対策 | cron-job.org（15分ごとにPingを送信） |
 
 ---
 
