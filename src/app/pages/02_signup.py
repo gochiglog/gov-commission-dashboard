@@ -46,8 +46,9 @@ if submitted:
         st.warning('このメールアドレスはすでに登録されています。')
     else:
         try:
-            # username にメールアドレスを使用することでログイン時にメアドで入力可能にする
-            add_user(email, password, email)
+            with st.spinner('アカウントを作成中...'):
+                # username にメールアドレスを使用することでログイン時にメアドで入力可能にする
+                add_user(email, password, email)
         except Exception as e:
             st.error(f'登録に失敗しました: {e}')
             st.stop()
