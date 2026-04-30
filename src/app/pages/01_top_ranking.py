@@ -98,7 +98,7 @@ with st.sidebar:
     selected_ministry = st.selectbox('省庁', ministries)
 
     base = df[df['ministry'] == selected_ministry]
-    all_years = sorted(base['fiscal_year'].unique().tolist())
+    all_years = sorted(y for y in base['fiscal_year'].unique().tolist() if y not in {2021})
 
     period_options = ['総合（全年度）'] + [f'{y}年度' for y in all_years]
     selected_period = st.selectbox('期間', period_options, index=0)
