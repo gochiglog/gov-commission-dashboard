@@ -2,7 +2,6 @@ import json
 import os
 import sqlite3
 import sys
-import time
 from pathlib import Path
 
 import pandas as pd
@@ -58,8 +57,7 @@ def _show_login() -> None:
         if st.form_submit_button('ログイン'):
             if _authenticate(username, password):
                 st.session_state['authenticated'] = True
-                with st.spinner('ログイン中... 画面が切り替わるまで5〜10秒程度かかる場合があります'):
-                    time.sleep(1)
+                st.info('ログイン中... 画面が切り替わるまでそのままお待ちください')
                 st.rerun()
             else:
                 st.error('IDまたはパスワードが正しくありません')

@@ -52,5 +52,5 @@ if submitted:
         except Exception as e:
             st.error(f'登録に失敗しました: {e}')
             st.stop()
-        st.success('アカウントを作成しました！')
-        st.info(f'以下のURLにアクセスし、メールアドレスとパスワードでログインしてください。\n\n{_DASHBOARD_URL}')
+        st.success('アカウントを作成しました！登録したメールアドレスとパスワードでログインできます。')
+        st.link_button('ログインページへ進む →', _DASHBOARD_URL, use_container_width=True)
