@@ -68,17 +68,23 @@ def add_user(username: str, password: str, email: str) -> None:
         conn.close()
 
 
-def authenticate_user(username: str, password: str) -> bool:
+def authenticate_user(login: str, password: str) -> bool:
+    """username または email でログイン可能"""
     client = _supabase()
     if client:
-        result = client.table('users').select('password_hash').eq('username', username).execute()
+        result = (
+            client.table('users')
+            .select('password_hash')
+            .or_(f'username.eq.{login},email.eq.{login}')
+            .execute()
+        )
         if not result.data:
             return False
         return result.data[0]['password_hash'] == _hash(password)
     else:
         conn = _sqlite_conn()
         row = conn.execute(
-            'SELECT password_hash FROM users WHERE username = ?', (username,)
+            'SELECT password_hash FROM users WHERE username = ? OR email = ?', (login, login)
         ).fetchone()
         conn.close()
         return row is not None and row[0] == _hash(password)

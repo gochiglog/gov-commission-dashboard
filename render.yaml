@@ -12,10 +12,6 @@ services:
         sync: false
       - key: INVITE_TOKEN
         sync: false
-      - key: GMAIL_USER
-        sync: false
-      - key: GMAIL_APP_PASSWORD
-        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY

@@ -49,7 +49,7 @@ if not st.session_state['authenticated']:
     st.title('官公庁委託調査ダッシュボード')
     with st.form('login_form'):
         st.subheader('ログイン')
-        username = st.text_input('ユーザーID')
+        username = st.text_input('メールアドレス / ユーザーID')
         password = st.text_input('パスワード', type='password')
         if st.form_submit_button('ログイン'):
             if _authenticate(username, password):
